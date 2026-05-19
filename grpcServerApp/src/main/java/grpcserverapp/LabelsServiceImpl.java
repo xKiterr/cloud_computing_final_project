@@ -68,6 +68,36 @@ public class LabelsServiceImpl extends LabelsServiceGrpc.LabelsServiceImplBase {
                     String requestId = UUID.randomUUID().toString();
                     System.out.println("Successfully uploaded " + fileName + ". Assigned ID: " + requestId);
 
+                    String projectId = "cn2526-t2-g10";
+                    String topicId = "cn2026-image-processing";
+
+                    com.google.pubsub.v1.TopicName topicName = com.google.pubsub.v1.TopicName.of(projectId, topicId);
+                    com.google.cloud.pubsub.v1.Publisher publisher = null;
+
+                    try {
+                        publisher = com.google.cloud.pubsub.v1.Publisher.newBuilder(topicName).build();
+
+                        String messagePayload = String.format(
+                                "{\"requestId\":\"%s\", \"bucketName\":\"%s\", \"blobName\":\"%s\"}",
+                                requestId, bucketName, fileName
+                        );
+
+                        com.google.protobuf.ByteString data = com.google.protobuf.ByteString.copyFromUtf8(messagePayload);
+                        com.google.pubsub.v1.PubsubMessage pubsubMessage = com.google.pubsub.v1.PubsubMessage.newBuilder()
+                                .setData(data)
+                                .build();
+
+                        publisher.publish(pubsubMessage).get();
+                        System.out.println("Published processing request to Pub/Sub for ID: " + requestId);
+
+                    } catch (Exception e) {
+                        System.err.println("Failed to publish message: " + e.getMessage());
+                    } finally {
+                        if (publisher != null) {
+                            publisher.shutdown();
+                        }
+                    }
+
                     SubmitResponse response = SubmitResponse.newBuilder()
                             .setRequestId(requestId)
                             .build();

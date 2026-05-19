@@ -1,0 +1,4 @@
+# Project exclude paths
+/grpcClientApp/target/
+/grpcContract/target/
+/grpcServerApp/target/

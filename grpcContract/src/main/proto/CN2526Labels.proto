@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option java_package = "cn2026.labels.contract";
+
+package cn2026;
+
+
+service LabelsService {
+  rpc submitImage(stream ImageBlock) returns (SubmitResponse);
+
+  rpc getProcessingResult(ResultRequest) returns (ResultResponse);
+
+  rpc searchImages(SearchRequest) returns (stream SearchResult);
+
+  rpc scaleGrpcServers(ScaleRequest) returns (ScaleResponse);
+
+  rpc scaleWorkers(ScaleRequest) returns (ScaleResponse);
+}
+
+message ImageBlock {
+  string fileName = 1;
+  bytes chunk = 2;
+}
+
+message SubmitResponse {
+  string requestId = 1;
+}
+
+message ResultRequest {
+  string requestId = 1;
+}
+
+message ResultResponse {
+  string dateProcessed = 1;
+  map<string, string> labels = 2;
+}
+
+message SearchRequest {
+  string startDate = 1;
+  string endDate = 2;
+  string characteristic = 3;
+}
+
+message SearchResult {
+  string fileName = 1;
+  string dateProcessed = 2;
+}
+
+
+message ScaleRequest {
+  int32 targetInstances = 1;
+}
+
+message ScaleResponse {
+  bool success = 1;
+  string message = 2;
+}

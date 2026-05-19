@@ -14,7 +14,7 @@ import java.util.UUID;
 public class LabelsServiceImpl extends LabelsServiceGrpc.LabelsServiceImplBase {
 
     private final Storage storage;
-    private final String bucketName = "cn2026-labels-bucket";
+    private final String bucketName = "cn2526-labels-bucket";
 
     public LabelsServiceImpl(Storage storage) {
         this.storage = storage;

@@ -47,7 +47,7 @@
                     </descriptors>
                     <archive>
                         <manifest>
-                            <mainClass>grpcserverapp.ForumServer</mainClass>
+                            <mainClass>grpcserverapp.GrpcServerMain</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

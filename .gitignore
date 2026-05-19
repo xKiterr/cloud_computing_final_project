@@ -2,3 +2,4 @@
 /grpcClientApp/target/
 /grpcContract/target/
 /grpcServerApp/target/
+target/

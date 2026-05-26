@@ -100,5 +100,6 @@
         <module>grpcContract</module>
         <module>grpcClientApp</module>
         <module>grpcServerApp</module>
+        <module>labelsWorkerApp</module>
     </modules>
 </project>

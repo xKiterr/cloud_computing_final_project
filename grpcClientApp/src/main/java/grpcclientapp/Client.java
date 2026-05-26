@@ -81,7 +81,7 @@ public class Client {
             System.out.println("2. Check result by Request ID (Not Implemented)");
             System.out.println("3. Search images by Date/Label (Not Implemented)");
             System.out.println("4. Change VM quantity for gRPC Server Group");
-            System.out.println("5. Change VM quantity for Labels App Group (Not implemented");
+            System.out.println("5. Change VM quantity for Labels App Group");
             System.out.println("0. Exit");
 
             String choice = scanner.nextLine();
@@ -109,7 +109,7 @@ public class Client {
                     break;
 
                 case "5":
-                    System.out.print("Enter new VM quantity for the Labels App Worker Group: (To be implemented) ");
+                    System.out.print("Enter new VM quantity for the Labels App Worker Group: ");
                     int workerSize = Integer.parseInt(scanner.nextLine());
                     resizeManagedInstanceGroup(projectId, zone, workerMigName, workerSize);
                     break;

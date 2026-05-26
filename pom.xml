@@ -86,7 +86,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>cn2026.server.GrpcServerMain</mainClass>
+                            <mainClass>grpcserverapp.GrpcServerMain</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

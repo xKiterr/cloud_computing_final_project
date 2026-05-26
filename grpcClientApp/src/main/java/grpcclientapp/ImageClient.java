@@ -25,12 +25,12 @@ public class ImageClient {
         StreamObserver<SubmitResponse> responseObserver = new StreamObserver<SubmitResponse>() {
             @Override
             public void onNext(SubmitResponse response) {
-                System.out.println("✅ Upload complete! Your Request ID is: " + response.getRequestId());
+                System.out.println("Upload complete! Your Request ID is: " + response.getRequestId());
             }
 
             @Override
             public void onError(Throwable t) {
-                System.err.println("❌ Upload failed: " + t.getMessage());
+                System.err.println("Upload failed: " + t.getMessage());
                 finishLatch.countDown();
             }
 

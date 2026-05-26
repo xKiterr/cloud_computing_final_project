@@ -3,13 +3,45 @@ package grpcclientapp;
 import cn2026.labels.contract.LabelsServiceGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Scanner;
 
 public class Client {
 
     public static void main(String[] args) {
-        String target = "localhost:8080";
+        String lookupUrl = "https://grpc-lookup-52998376201.europe-southwest1.run.app";
+        String targetIp = "localhost"; //fallback
+
+        System.out.println("Fetching active server IP from Cloud Run...");
+        try {
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(lookupUrl))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                targetIp = response.body().trim();
+                System.out.println("Successfully found active server: " + targetIp);
+            } else {
+                System.err.println("Lookup failed (HTTP " + response.statusCode() + "). Check your Cloud Run logs.");
+                return;
+            }
+        } catch (Exception e) {
+            System.err.println("Error contacting lookup service: " + e.getMessage());
+            return;
+        }
+
+        String target = targetIp + ":8080";
         System.out.println("Connecting to gRPC server at " + target + "...");
 
         ManagedChannel channel = ManagedChannelBuilder.forTarget(target)

@@ -31,9 +31,7 @@ exports.getGrpcIp = async (req, res) => {
             return res.status(404).send("No active servers currently running.");
         }
 
-        const selectedIp = activeIps[Math.floor(Math.random() * activeIps.length)];
-
-        res.status(200).send(selectedIp);
+        res.status(200).send(activeIps.join(','));
 
     } catch (error) {
         console.error(error);

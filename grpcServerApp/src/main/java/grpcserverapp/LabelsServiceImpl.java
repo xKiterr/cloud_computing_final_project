@@ -1,14 +1,18 @@
 package grpcserverapp;
 
-import cn2026.labels.contract.ImageBlock;
-import cn2026.labels.contract.LabelsServiceGrpc;
-import cn2026.labels.contract.SubmitResponse;
+import cn2026.labels.contract.*;
 import com.google.cloud.WriteChannel;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import io.grpc.stub.StreamObserver;
+import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.FirestoreOptions;
+import com.google.cloud.firestore.DocumentSnapshot;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class LabelsServiceImpl extends LabelsServiceGrpc.LabelsServiceImplBase {
@@ -110,5 +114,89 @@ public class LabelsServiceImpl extends LabelsServiceGrpc.LabelsServiceImplBase {
                 }
             }
         };
+    }
+
+    @Override
+    public void getProcessingResult(ResultRequest request, StreamObserver<ResultResponse> responseObserver) {
+        try {
+            Firestore db = FirestoreOptions.getDefaultInstance().getService();
+
+            DocumentSnapshot document = db.collection("image-results")
+                    .document(request.getRequestId())
+                    .get()
+                    .get();
+
+            if (document.exists()) {
+                String dateProcessed = document.getTimestamp("processedDate").toString();
+                List<String> labelsEn = (List<String>) document.get("labelsEn");
+                List<String> labelsPt = (List<String>) document.get("labelsPt");
+
+                Map<String, String> labelsMap = new HashMap<>();
+                if (labelsEn != null && labelsPt != null) {
+                    for (int i = 0; i < labelsEn.size(); i++) {
+                        labelsMap.put(labelsEn.get(i), labelsPt.get(i));
+                    }
+                }
+
+                ResultResponse response = ResultResponse.newBuilder()
+                        .setDateProcessed(dateProcessed)
+                        .putAllLabels(labelsMap)
+                        .build();
+
+                responseObserver.onNext(response);
+                responseObserver.onCompleted();
+            } else {
+                responseObserver.onError(io.grpc.Status.NOT_FOUND
+                        .withDescription("Request ID not found. It might still be processing or the ID is wrong.")
+                        .asRuntimeException());
+            }
+        } catch (Exception e) {
+            System.err.println("Firestore Error: " + e.getMessage());
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                    .withDescription("Server error while querying database.")
+                    .asRuntimeException());
+        }
+
+
+    }
+
+    @Override
+    public void searchImages(SearchRequest request, StreamObserver<SearchResult> responseObserver) {
+        try {
+            Firestore db = FirestoreOptions.getDefaultInstance().getService();
+            String keyword = request.getCharacteristic().toLowerCase();
+
+            com.google.api.core.ApiFuture<com.google.cloud.firestore.QuerySnapshot> future = db.collection("image-results")
+                    .whereArrayContains("labelsEn", keyword)
+                    .get();
+
+            List<com.google.cloud.firestore.QueryDocumentSnapshot> documents = future.get().getDocuments();
+
+            boolean found = false;
+            for (com.google.cloud.firestore.QueryDocumentSnapshot document : documents) {
+                String dateProcessed = document.getTimestamp("processedDate").toDate().toString();
+                String fileName = document.getString("blobName");
+
+                SearchResult result = SearchResult.newBuilder()
+                        .setFileName(fileName != null ? fileName : "Unknown File")
+                        .setDateProcessed(dateProcessed)
+                        .build();
+
+                responseObserver.onNext(result);
+                found = true;
+            }
+
+            if (!found) {
+                System.out.println("No images found containing the label: " + keyword);
+            }
+
+            responseObserver.onCompleted();
+
+        } catch (Exception e) {
+            System.err.println("Search Error: " + e.getMessage());
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                    .withDescription("Server error during search.")
+                    .asRuntimeException());
+        }
     }
 }

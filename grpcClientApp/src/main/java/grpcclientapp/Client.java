@@ -97,10 +97,30 @@ public class Client {
                     }
                     break;
                 case "2":
-                    System.out.println("SF2: To be implemented (Firestore integration)");
+                    System.out.print("Enter your Request ID: ");
+                    String requestId = scanner.nextLine();
+                    try {
+                        imageClient.checkResult(requestId);
+                    } catch (Exception e) {
+                        System.err.println("Failed to get result: " + e.getMessage());
+                    }
                     break;
                 case "3":
-                    System.out.println("SF3: To be implemented (Firestore integration)");
+                    System.out.println("Search Images");
+                    System.out.print("Enter start date (YYYY-MM-DD) or press Enter to skip: ");
+                    String startDate = scanner.nextLine();
+
+                    System.out.print("Enter end date (YYYY-MM-DD) or press Enter to skip: ");
+                    String endDate = scanner.nextLine();
+
+                    System.out.print("Enter characteristic to search for (e.g., 'cat', 'car'): ");
+                    String keyword = scanner.nextLine();
+
+                    try {
+                        imageClient.searchDatabase(startDate, endDate, keyword);
+                    } catch (Exception e) {
+                        System.err.println("Search error: " + e.getMessage());
+                    }
                     break;
                 case "4":
                     System.out.print("Enter new VM quantity for the gRPC Server Group: ");

@@ -18,6 +18,11 @@ public class ImageClient {
     }
 
     public void uploadImage(String filePath) throws InterruptedException {
+        Path path = Paths.get(filePath);
+        if (!Files.exists(path) || Files.isDirectory(path)) {
+            System.err.println("Error: File does not exist or is a directory at " + filePath);
+            return;
+        }
         CountDownLatch finishLatch = new CountDownLatch(1);
 
         StreamObserver<SubmitResponse> responseObserver = new StreamObserver<SubmitResponse>() {
@@ -41,7 +46,6 @@ public class ImageClient {
         StreamObserver<ImageBlock> requestObserver = asyncStub.submitImage(responseObserver);
 
         try {
-            Path path = Paths.get(filePath);
             InputStream inputStream = Files.newInputStream(path);
             byte[] buffer = new byte[64 * 1024];
             int bytesRead;
@@ -114,7 +118,7 @@ public class ImageClient {
                 .setCharacteristic(keyword)
                 .build();
 
-        System.out.println("\nSearch Results for '" + keyword);
+        System.out.println("\nSearch Results for '" + keyword +"'");
 
         asyncStub.searchImages(request, new StreamObserver<SearchResult>() {
             boolean foundAny = false;

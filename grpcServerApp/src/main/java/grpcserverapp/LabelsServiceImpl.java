@@ -1,14 +1,18 @@
 package grpcserverapp;
 
 import cn2026.labels.contract.*;
+import com.google.api.core.ApiFuture;
+import com.google.cloud.Timestamp;
 import com.google.cloud.WriteChannel;
+import com.google.cloud.firestore.*;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.pubsub.v1.Publisher;
+import com.google.pubsub.v1.PubsubMessage;
+import com.google.pubsub.v1.TopicName;
+import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.FirestoreOptions;
-import com.google.cloud.firestore.DocumentSnapshot;
 
 import java.util.HashMap;
 import java.util.List;
@@ -75,19 +79,19 @@ public class LabelsServiceImpl extends LabelsServiceGrpc.LabelsServiceImplBase {
                     String projectId = "cn2526-t2-g10";
                     String topicId = "cn2026-image-processing";
 
-                    com.google.pubsub.v1.TopicName topicName = com.google.pubsub.v1.TopicName.of(projectId, topicId);
-                    com.google.cloud.pubsub.v1.Publisher publisher = null;
+                    TopicName topicName = TopicName.of(projectId, topicId);
+                    Publisher publisher = null;
 
                     try {
-                        publisher = com.google.cloud.pubsub.v1.Publisher.newBuilder(topicName).build();
+                        publisher = Publisher.newBuilder(topicName).build();
 
                         String messagePayload = String.format(
                                 "{\"requestId\":\"%s\", \"bucketName\":\"%s\", \"blobName\":\"%s\"}",
                                 requestId, bucketName, fileName
                         );
 
-                        com.google.protobuf.ByteString data = com.google.protobuf.ByteString.copyFromUtf8(messagePayload);
-                        com.google.pubsub.v1.PubsubMessage pubsubMessage = com.google.pubsub.v1.PubsubMessage.newBuilder()
+                        ByteString data = ByteString.copyFromUtf8(messagePayload);
+                        PubsubMessage pubsubMessage = PubsubMessage.newBuilder()
                                 .setData(data)
                                 .build();
 
@@ -96,6 +100,10 @@ public class LabelsServiceImpl extends LabelsServiceGrpc.LabelsServiceImplBase {
 
                     } catch (Exception e) {
                         System.err.println("Failed to publish message: " + e.getMessage());
+                        responseObserver.onError(io.grpc.Status.INTERNAL
+                                .withDescription("Failed to queue image for processing.")
+                                .asRuntimeException());
+                        return;
                     } finally {
                         if (publisher != null) {
                             publisher.shutdown();
@@ -119,7 +127,10 @@ public class LabelsServiceImpl extends LabelsServiceGrpc.LabelsServiceImplBase {
     @Override
     public void getProcessingResult(ResultRequest request, StreamObserver<ResultResponse> responseObserver) {
         try {
-            Firestore db = FirestoreOptions.getDefaultInstance().getService();
+            Firestore db = FirestoreOptions.newBuilder()
+                    .setDatabaseId("cn2526-t2-g10-db")
+                    .build()
+                    .getService();
 
             DocumentSnapshot document = db.collection("image-results")
                     .document(request.getRequestId())
@@ -132,10 +143,12 @@ public class LabelsServiceImpl extends LabelsServiceGrpc.LabelsServiceImplBase {
                 List<String> labelsPt = (List<String>) document.get("labelsPt");
 
                 Map<String, String> labelsMap = new HashMap<>();
-                if (labelsEn != null && labelsPt != null) {
+                if (labelsEn != null && labelsPt != null && labelsEn.size() == labelsPt.size()) {
                     for (int i = 0; i < labelsEn.size(); i++) {
                         labelsMap.put(labelsEn.get(i), labelsPt.get(i));
                     }
+                } else {
+                    System.err.println("Warning: Label arrays are missing or mismatched for ID: " + request.getRequestId());
                 }
 
                 ResultResponse response = ResultResponse.newBuilder()
@@ -163,18 +176,61 @@ public class LabelsServiceImpl extends LabelsServiceGrpc.LabelsServiceImplBase {
     @Override
     public void searchImages(SearchRequest request, StreamObserver<SearchResult> responseObserver) {
         try {
-            Firestore db = FirestoreOptions.getDefaultInstance().getService();
-            String keyword = request.getCharacteristic().toLowerCase();
+            Firestore db = FirestoreOptions.newBuilder()
+                    .setDatabaseId("cn2526-t2-g10-db")
+                    .build()
+                    .getService();
+            String keyword = request.getCharacteristic().toLowerCase().trim();
 
-            com.google.api.core.ApiFuture<com.google.cloud.firestore.QuerySnapshot> future = db.collection("image-results")
-                    .whereArrayContains("labelsEn", keyword)
-                    .get();
+            if (keyword.isEmpty()) {
+                responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                        .withDescription("Search characteristic cannot be empty.")
+                        .asRuntimeException());
+                return;
+            }
 
-            List<com.google.cloud.firestore.QueryDocumentSnapshot> documents = future.get().getDocuments();
+            Query query = db.collection("image-results")
+                    .where(Filter.or(
+                            Filter.arrayContains("labelsEn", keyword),
+                            Filter.arrayContains("labelsPt", keyword)
+                    ));
+
+            Timestamp startTimestamp = null;
+            Timestamp endTimestamp = null;
+
+            try {
+                String startDateStr = request.getStartDate();
+                if (startDateStr != null && !startDateStr.trim().isEmpty()) {
+                    startTimestamp = Timestamp.parseTimestamp(startDateStr + "T00:00:00Z");
+                }
+
+                String endDateStr = request.getEndDate();
+                if (endDateStr != null && !endDateStr.trim().isEmpty()) {
+                    endTimestamp = Timestamp.parseTimestamp(endDateStr + "T23:59:59Z");
+                }
+            } catch (Exception e) {
+                responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                        .withDescription("Invalid date format. Please use exactly YYYY-MM-DD.")
+                        .asRuntimeException());
+                return;
+            }
+
+            ApiFuture<QuerySnapshot> future = query.get();
+            List<QueryDocumentSnapshot> documents = future.get().getDocuments();
 
             boolean found = false;
-            for (com.google.cloud.firestore.QueryDocumentSnapshot document : documents) {
-                String dateProcessed = document.getTimestamp("processedDate").toDate().toString();
+            for (QueryDocumentSnapshot document : documents) {
+                Timestamp docDate = document.getTimestamp("processedDate");
+
+                if (startTimestamp != null && docDate.compareTo(startTimestamp) < 0) {
+                    continue;
+                }
+
+                if (endTimestamp != null && docDate.compareTo(endTimestamp) > 0) {
+                    continue;
+                }
+
+                String dateProcessed = docDate.toDate().toString();
                 String fileName = document.getString("blobName");
 
                 SearchResult result = SearchResult.newBuilder()

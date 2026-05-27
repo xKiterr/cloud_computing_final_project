@@ -78,8 +78,8 @@ public class Client {
         while (running) {
             System.out.println("\nSelect an operation:");
             System.out.println("1. Submit image for processing");
-            System.out.println("2. Check result by Request ID (Not Implemented)");
-            System.out.println("3. Search images by Date/Label (Not Implemented)");
+            System.out.println("2. Check result by Request ID");
+            System.out.println("3. Search images by Date/Label");
             System.out.println("4. Change VM quantity for gRPC Server Group");
             System.out.println("5. Change VM quantity for Labels App Group");
             System.out.println("0. Exit");
@@ -90,6 +90,8 @@ public class Client {
                 case "1":
                     System.out.print("Enter the absolute path to the image file: ");
                     String filePath = scanner.nextLine();
+
+                    filePath = filePath.replace("'", "").replace("\"", "").trim();//remove quotes from dragged files and spaces
                     try {
                         imageClient.uploadImage(filePath);
                     } catch (Exception e) {

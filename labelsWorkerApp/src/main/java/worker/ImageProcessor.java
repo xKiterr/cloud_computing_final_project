@@ -23,6 +23,11 @@ public class ImageProcessor {
         List<String> labels = visionService.detectLabels(gsUri);
         List<String> translatedLabels = translationService.translateLabels(labels);
 
+        for (int i = 0; i < labels.size(); i++) {
+            labels.set(i, labels.get(i).toLowerCase());
+            translatedLabels.set(i, translatedLabels.get(i).toLowerCase());
+        }
+
         System.out.println("Detected and translated labels:");
         for (int i = 0; i < labels.size(); i++) {
             System.out.println("- " + labels.get(i) + " -> " + translatedLabels.get(i));
